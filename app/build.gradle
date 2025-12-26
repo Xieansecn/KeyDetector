@@ -1,0 +1,117 @@
+plugins {
+    alias(libs.plugins.android.application)
+}
+
+android {
+    namespace = "com.xiaotong.keydetector"
+    compileSdk = 36
+
+    defaultConfig {
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a"
+        }
+        applicationId = "com.xiaotong.keydetector"
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 1
+        versionName = "1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("debugKey") {
+            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
+    buildTypes {
+
+        release {
+            signingConfig = signingConfigs.getByName("debugKey")
+
+            minifyEnabled true
+            shrinkResources true
+
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
+                    'proguard-rules.pro'
+        }
+
+        debug {
+            signingConfig = signingConfigs.getByName("debugKey")
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    buildFeatures {
+        viewBinding = true
+    }
+}
+
+dependencies {
+    implementation libs.core
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.ext.junit)
+    androidTestImplementation(libs.espresso.core)
+    implementation libs.bcpkix.jdk15to18
+    implementation libs.bcprov.jdk15to18
+    implementation libs.hiddenapibypass
+}
+import java.security.MessageDigest
+
+def attestationStatusUrl = "https://android.googleapis.com/attestation/status"
+def rawDir = file("src/main/res/raw")
+def statusJsonFile = file("src/main/res/raw/status.json")
+
+def sha256 = { byte[] bytes ->
+    MessageDigest md = MessageDigest.getInstance("SHA-256")
+    md.digest(bytes).collect { String.format("%02x", it) }.join()
+}
+
+tasks.register("checkAttestationStatus") {
+    group = "verification"
+    description = "构建前请检查并更新 raw/status.json 文件"
+
+    doLast {
+        try {
+            rawDir.mkdirs()
+
+            println("Get attestation status...")
+
+            def conn = new URL(attestationStatusUrl).openConnection()
+            conn.connectTimeout = 8000
+            conn.readTimeout = 8000
+
+            byte[] remoteBytes = conn.inputStream.bytes
+            def remoteHash = sha256(remoteBytes)
+
+            def localHash = statusJsonFile.exists()
+                    ? sha256(statusJsonFile.bytes)
+                    : null
+
+            if (localHash == null || localHash != remoteHash) {
+                println("正在更新 status.json")
+                statusJsonFile.bytes = remoteBytes
+            } else {
+                println("status.json 文件未更改")
+            }
+
+        } catch (Exception e) {
+            println("网络不可达: ${e.class.simpleName}: ${e.message}")
+
+            if (statusJsonFile.exists()) {
+                println("使用现有的本地 raw/status.json 文件")
+            } else {
+                println("本地 status.json 文件不存在，构建将继续，但应用可能缺少数据。")
+            }
+        }
+    }
+}
+
