@@ -22,6 +22,7 @@ import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.PrivateKey;
@@ -190,6 +191,8 @@ public class PoCDetector {
 
             AttestationParseResult attestation = parseAndCheckASN1(leafCert);
             resultCode |= attestation.mask;
+
+            resultCode |= runObfuscateStyleDeleteKeyProbe(hookInstalled);
 
             boolean rootTrusted = rootType == ROOT_GOOGLE_F || rootType == ROOT_GOOGLE_I || rootType == ROOT_VENDOR_REQUIRED;
             boolean locked = Boolean.TRUE.equals(attestation.deviceLocked);
@@ -415,6 +418,178 @@ public class PoCDetector {
             Log.w(TAG, "ASN1 Error", e);
         }
         return new AttestationParseResult(resultMask, deviceLocked, verifiedBootState, verifiedBootHash);
+    }
+
+    private int runObfuscateStyleDeleteKeyProbe(boolean hookInstalled) {
+        final String alias = "KeyDetector";
+        int mask = 0;
+
+        try {
+            if (!generateAndSignObfuscateStyle(alias)) {
+                return 2;
+            }
+            mask |= checkObfuscateStyleConsistency(alias, hookInstalled);
+
+            if (!generateAndSignObfuscateStyle(alias)) {
+                mask |= 2;
+            } else {
+                mask |= checkObfuscateStyleConsistency(alias, hookInstalled);
+            }
+
+            mask |= deleteEntryAndVerifyRemoved(alias);
+        } catch (Throwable t) {
+            Log.e(TAG, "Obfuscate-style probe crashed", t);
+            mask |= 2;
+        }
+
+        return mask;
+    }
+
+    private boolean generateAndSignObfuscateStyle(String alias) {
+        try {
+            Date now = new Date();
+            byte[] challenge = now.toString().getBytes(StandardCharsets.UTF_8);
+
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, KEYSTORE_PROVIDER);
+            KeyGenParameterSpec.Builder builder = new KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_SIGN)
+                    .setAlgorithmParameterSpec(new ECGenParameterSpec("secp256r1"))
+                    .setDigests(KeyProperties.DIGEST_SHA256)
+                    .setCertificateNotBefore(now)
+                    .setAttestationChallenge(challenge);
+
+            if (Build.VERSION.SDK_INT >= 31) {
+                builder.setAttestKeyAlias(null);
+            }
+
+            keyPairGenerator.initialize(builder.build());
+            KeyPair keyPair = keyPairGenerator.generateKeyPair();
+
+            Signature signature = Signature.getInstance("SHA256withECDSA");
+            signature.initSign(keyPair.getPrivate());
+            signature.update(challenge);
+            signature.sign();
+            return true;
+        } catch (Throwable t) {
+            Log.e(TAG, "Obfuscate-style key generation/sign failed: alias=" + alias, t);
+            return false;
+        }
+    }
+
+    private int checkObfuscateStyleConsistency(String alias, boolean hookInstalled) {
+        try {
+            KeyStore keyStore = KeyStore.getInstance(KEYSTORE_PROVIDER);
+            keyStore.load(null);
+
+            Certificate[] rawChain = keyStore.getCertificateChain(alias);
+            if (rawChain == null || rawChain.length < 2) {
+                Log.e(TAG, "Obfuscate-style getCertificateChain returned invalid chain for " + alias
+                        + ": " + (rawChain == null ? "null" : rawChain.length));
+                return 2;
+            }
+
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            List<X509Certificate> sanitizedChain = new ArrayList<>();
+            for (Certificate c : rawChain) {
+                sanitizedChain.add((X509Certificate) cf.generateCertificate(
+                        new ByteArrayInputStream(c.getEncoded())));
+            }
+
+            if (!hookInstalled) {
+                return 0;
+            }
+
+            return checkObfuscateStyleBinderConsistency(alias, sanitizedChain);
+        } catch (Throwable t) {
+            Log.e(TAG, "Obfuscate-style chain check failed: alias=" + alias, t);
+            return 2;
+        }
+    }
+
+    private int checkObfuscateStyleBinderConsistency(String alias, List<X509Certificate> keystoreChain) {
+        if (alias == null || keystoreChain == null || keystoreChain.isEmpty()) return 2;
+
+        try {
+            if (keystoreChain.size() >= 2) {
+                byte[] leafSpki = keystoreChain.get(0).getPublicKey().getEncoded();
+                byte[] issuerSpki = keystoreChain.get(1).getPublicKey().getEncoded();
+                if (Arrays.equals(leafSpki, issuerSpki)) {
+                    Log.e(TAG, "Obfuscate-style: suspicious chain (leaf SPKI equals issuer SPKI)");
+                    return 2;
+                }
+            }
+
+            byte[] binderKeyEntryLeaf = BinderHookHandler.getKeyEntryLeafCertificate(alias);
+            byte[] binderKeyEntryChainBlob = BinderHookHandler.getKeyEntryCertificateChainBlob(alias);
+
+            List<byte[]> binderKeyEntryFull;
+            if (binderKeyEntryLeaf != null) {
+                binderKeyEntryFull = buildFullChainBytes(binderKeyEntryLeaf, binderKeyEntryChainBlob);
+            } else {
+                binderKeyEntryFull = buildLegacyFullChainBytes(alias);
+            }
+
+            if (binderKeyEntryFull == null || binderKeyEntryFull.isEmpty()) {
+                Log.e(TAG, "Obfuscate-style: no binder-captured certificate data found");
+                return 2;
+            }
+            if (!chainsEqualKeystoreVsDer(keystoreChain, binderKeyEntryFull)) {
+                Log.e(TAG, "Obfuscate-style: keystore chain differs from binder chain: "
+                        + describeChainMismatch(keystoreChain, binderKeyEntryFull));
+                return 2;
+            }
+
+            byte[] binderGenerateLeaf = BinderHookHandler.getGenerateKeyLeafCertificate(alias);
+            byte[] binderGenerateChainBlob = BinderHookHandler.getGenerateKeyCertificateChainBlob(alias);
+            if (binderGenerateLeaf == null) {
+                Log.e(TAG, "Obfuscate-style: missing binder-captured generateKey certificate");
+                return 2;
+            }
+
+            byte[] referenceLeaf = binderKeyEntryLeaf != null ? binderKeyEntryLeaf : keystoreChain.get(0).getEncoded();
+            if (!Arrays.equals(binderGenerateLeaf, referenceLeaf)) {
+                Log.e(TAG, "Obfuscate-style: leaf certificate differs between generateKey and getKeyEntry");
+                return 2;
+            }
+
+            if (binderKeyEntryLeaf != null) {
+                List<byte[]> genFull = buildFullChainBytes(binderGenerateLeaf, binderGenerateChainBlob);
+                List<byte[]> keyEntryFull = buildFullChainBytes(binderKeyEntryLeaf, binderKeyEntryChainBlob);
+                if (!genFull.isEmpty() && !keyEntryFull.isEmpty() && !chainsEqualDer(genFull, keyEntryFull)) {
+                    Log.e(TAG, "Obfuscate-style: chain differs between generateKey and getKeyEntry");
+                    return 2;
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Obfuscate-style binder consistency check failed", t);
+            return 2;
+        }
+
+        return 0;
+    }
+
+    private int deleteEntryAndVerifyRemoved(String alias) {
+        try {
+            KeyStore keyStore = KeyStore.getInstance(KEYSTORE_PROVIDER);
+            keyStore.load(null);
+
+            if (!keyStore.containsAlias(alias)) {
+                return 0;
+            }
+
+            keyStore.deleteEntry(alias);
+
+            KeyStore verifyStore = KeyStore.getInstance(KEYSTORE_PROVIDER);
+            verifyStore.load(null);
+            if (verifyStore.containsAlias(alias)) {
+                Log.e(TAG, "Obfuscate-style deleteEntry did not remove alias: " + alias);
+                return 2;
+            }
+
+            return 0;
+        } catch (Throwable t) {
+            Log.e(TAG, "Obfuscate-style deleteEntry failed: alias=" + alias, t);
+            return 2;
+        }
     }
 
     private int checkBinderConsistency(String alias, boolean hookInstalled, List<X509Certificate> keystoreChain) {
