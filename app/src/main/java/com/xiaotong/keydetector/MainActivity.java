@@ -79,13 +79,9 @@ public class MainActivity extends Activity {
                 final int finalCode = code;
                 runOnUiThread(() -> {
                     tvResult.setText(resultText);
-                    boolean ok = (finalCode & 1) != 0
-                            && (finalCode & (2 | 8 | 16 | 32 | 64 | 128 | 256 | 512)) == 0;
-                    if (!ok) {
-                        tvResult.setTextColor(Color.RED);
-                    } else {
-                        tvResult.setTextColor(Color.parseColor("#006400"));
-                    }
+                    int color = Color.parseColor("#006400");
+                    if ((finalCode & 1) != 0) tvResult.setTextColor(Color.RED);
+                    tvResult.setTextColor(color);
                     btn.setEnabled(true);
                 });
             }).start();
