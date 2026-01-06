@@ -23,6 +23,7 @@ public class BinderHookHandler {
     private static final ConcurrentHashMap<String, byte[]> sGetKeyEntryLeafCertsByAlias = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, byte[]> sGetKeyEntryChainBlobsByAlias = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, byte[]> sLegacyGetByName = new ConcurrentHashMap<>();
+    private static boolean sHookSuccess = false;
 
     public static byte[] getGenerateKeyLeafCertificate(String alias) {
         return alias == null ? null : sGenerateKeyLeafCertsByAlias.get(alias);
@@ -44,6 +45,10 @@ public class BinderHookHandler {
         return name == null ? null : sLegacyGetByName.get(name);
     }
 
+    public static boolean isHookSuccess() {
+        return sHookSuccess;
+    }
+
     public static boolean installHook() {
         sInterceptedCertificate = null;
         sGenerateKeyLeafCertsByAlias.clear();
@@ -51,16 +56,19 @@ public class BinderHookHandler {
         sGetKeyEntryLeafCertsByAlias.clear();
         sGetKeyEntryChainBlobsByAlias.clear();
         sLegacyGetByName.clear();
+        sHookSuccess = false;
 
         if (Build.VERSION.SDK_INT >= 31) {
             if (installKeystore2Hook()) {
                 Log.d(TAG, "Keystore 2.0 Hook installed successfully.");
+                sHookSuccess = true;
                 return true;
             }
         }
 
         if (installLegacyKeystoreHook()) {
             Log.d(TAG, "Legacy Keystore Hook installed successfully.");
+            sHookSuccess = true;
             return true;
         }
 
@@ -363,3 +371,4 @@ public class BinderHookHandler {
         }
     }
 }
+

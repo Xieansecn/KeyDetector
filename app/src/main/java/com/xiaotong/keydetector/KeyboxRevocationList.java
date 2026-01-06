@@ -22,10 +22,10 @@ public final class KeyboxRevocationList {
     private static volatile Map<String, RevocationEntry> sEntries;
 
     public static final class RevocationEntry {
-        final String status;
-        final String reason;
+        public final String status;
+        public final String reason;
 
-        RevocationEntry(String status, String reason) {
+        public RevocationEntry(String status, String reason) {
             this.status = status;
             this.reason = reason;
         }

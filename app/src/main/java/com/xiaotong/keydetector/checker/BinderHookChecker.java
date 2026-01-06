@@ -11,7 +11,7 @@ public final class BinderHookChecker extends Checker {
 
     @Override
     public boolean check(CheckerContext ctx) throws Exception{
-        return !BinderHookHandler.installHook();
+        return !BinderHookHandler.isHookSuccess();
     }
 
     @Override

@@ -21,6 +21,8 @@ import android.security.keystore.KeyProperties;
 import android.util.Base64;
 import android.util.Log;
 
+import com.xiaotong.keydetector.handler.BinderHookHandler;
+
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.lsposed.hiddenapibypass.HiddenApiBypass;
 
@@ -37,8 +39,10 @@ import java.security.cert.X509Certificate;
 import java.security.spec.ECGenParameterSpec;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 public class Util {
     public static int classifyRootType(X509Certificate rootCert) {
@@ -89,6 +93,7 @@ public class Util {
     }
 
     static CheckerContext getCheckerContext(Context appContext) {
+        BinderHookHandler.installHook();
         Security.removeProvider("BC");
         if (Security.getProvider("BC") == null) Security.addProvider(new BouncyCastleProvider());
         try {
@@ -134,5 +139,139 @@ public class Util {
         byte[] challenge = new byte[size];
         new SecureRandom().nextBytes(challenge);
         return challenge;
+    }
+
+    public static List<byte[]> buildFullChainBytes(byte[] leafDer, byte[] chainBlob) {
+        List<byte[]> out = new ArrayList<>();
+        if (leafDer == null) return out;
+        out.add(leafDer);
+        if (chainBlob == null || chainBlob.length == 0) return out;
+        try {
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            Collection<? extends Certificate> certs = cf.generateCertificates(new ByteArrayInputStream(chainBlob));
+            for (Certificate c : certs) {
+                out.add(c.getEncoded());
+            }
+        } catch (Exception ignored) {
+        }
+        return out;
+    }
+
+    public static List<byte[]> buildLegacyFullChainBytes(String alias) {
+        List<byte[]> out = new ArrayList<>();
+        if (alias == null) return out;
+
+        byte[] userCert = BinderHookHandler.getLegacyKeystoreBlob("USRCERT_" + alias);
+        byte[] caCert = BinderHookHandler.getLegacyKeystoreBlob("CACERT_" + alias);
+        if (userCert == null && caCert == null) return out;
+
+        if (userCert != null) {
+            out.add(userCert);
+        } else if (caCert != null) {
+            out.add(caCert);
+        }
+
+        if (caCert != null && caCert.length > 0) {
+            try {
+                CertificateFactory cf = CertificateFactory.getInstance("X.509");
+                Collection<? extends Certificate> certs = cf.generateCertificates(new ByteArrayInputStream(caCert));
+                for (Certificate c : certs) {
+                    byte[] der = c.getEncoded();
+                    if (!out.isEmpty() && Arrays.equals(out.get(0), der)) continue;
+                    out.add(der);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        return out;
+    }
+
+    public static boolean chainsEqualKeystoreVsDer(List<X509Certificate> keystoreChain, List<byte[]> otherChainDer) {
+        if (keystoreChain == null || otherChainDer == null) return false;
+        if (keystoreChain.size() != otherChainDer.size()) return false;
+        try {
+            for (int i = 0; i < keystoreChain.size(); i++) {
+                if (!Arrays.equals(keystoreChain.get(i).getEncoded(), otherChainDer.get(i))) return false;
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static boolean chainsEqualDer(List<byte[]> a, List<byte[]> b) {
+        if (a == null || b == null) return false;
+        if (a.size() != b.size()) return false;
+        for (int i = 0; i < a.size(); i++) {
+            if (!Arrays.equals(a.get(i), b.get(i))) return false;
+        }
+        return true;
+    }
+
+    public static String describeChainMismatch(List<X509Certificate> keystoreChain, List<byte[]> otherChainDer) {
+        if (keystoreChain == null || otherChainDer == null) {
+            return "keystore=" + (keystoreChain == null ? "null" : "non-null")
+                    + " binder=" + (otherChainDer == null ? "null" : "non-null");
+        }
+        int min = Math.min(keystoreChain.size(), otherChainDer.size());
+        for (int i = 0; i < min; i++) {
+            try {
+                byte[] a = keystoreChain.get(i).getEncoded();
+                byte[] b = otherChainDer.get(i);
+                if (!Arrays.equals(a, b)) {
+                    return "mismatchIndex=" + i
+                            + " keystoreSerial=" + keystoreChain.get(i).getSerialNumber().toString(16).toLowerCase(Locale.US)
+                            + " binderSerial=" + tryGetSerialHex(b);
+                }
+            } catch (Throwable ignored) {
+                return "mismatchIndex=" + i + " (encode/parse failed)";
+            }
+        }
+        if (keystoreChain.size() != otherChainDer.size()) {
+            return "lengthMismatch keystore=" + keystoreChain.size() + " binder=" + otherChainDer.size();
+        }
+        return "unknown";
+    }
+
+    public static String tryGetSerialHex(byte[] certDer) {
+        if (certDer == null || certDer.length == 0) return "null";
+        try {
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            X509Certificate cert = (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certDer));
+            return cert.getSerialNumber().toString(16).toLowerCase(Locale.US);
+        } catch (Throwable t) {
+            return "parse_failed";
+        }
+    }
+
+    public static void logChain(String label, List<X509Certificate> chain) {
+        if (chain == null) {
+            Log.e("KeyDetector", label + ": null");
+            return;
+        }
+        Log.e("KeyDetector", label + ": size=" + chain.size());
+        for (int i = 0; i < chain.size(); i++) {
+            logCert(label + "[" + i + "]", chain.get(i));
+        }
+    }
+
+    public static void logCert(String label, X509Certificate cert) {
+        if (cert == null) {
+            Log.e("KeyDetector", label + ": null");
+            return;
+        }
+        try {
+            Log.e("KeyDetector", label
+                    + " serialHex=" + cert.getSerialNumber().toString(16).toLowerCase(Locale.US)
+                    + " sigAlg=" + cert.getSigAlgName()
+                    + " pubKeyAlg=" + cert.getPublicKey().getAlgorithm()
+                    + " notBefore=" + cert.getNotBefore()
+                    + " notAfter=" + cert.getNotAfter());
+            Log.e("KeyDetector", label + " subject=" + cert.getSubjectX500Principal());
+            Log.e("KeyDetector", label + " issuer=" + cert.getIssuerX500Principal());
+        } catch (Throwable t) {
+            Log.e("KeyDetector", label + ": failed to log certificate details", t);
+        }
     }
 }

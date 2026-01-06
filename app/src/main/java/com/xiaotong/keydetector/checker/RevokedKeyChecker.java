@@ -1,5 +1,7 @@
 package com.xiaotong.keydetector.checker;
 
+import android.util.Log;
+
 import com.xiaotong.keydetector.CheckerContext;
 import com.xiaotong.keydetector.KeyboxRevocationList;
 
@@ -18,6 +20,7 @@ public final class RevokedKeyChecker extends Checker {
             String serialHex = cert.getSerialNumber().toString(16).toLowerCase(Locale.US);
             KeyboxRevocationList.RevocationEntry entry = KeyboxRevocationList.getEntry(ctx.appContext, serialHex);
             if (entry != null && entry.isRevoked()) {
+                Log.e("Detector", "Revoked key detected: serial=" + serialHex + " reason=" + entry.reason);
                 return true;
             }
         }

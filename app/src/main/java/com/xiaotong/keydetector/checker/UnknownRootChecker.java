@@ -2,7 +2,10 @@ package com.xiaotong.keydetector.checker;
 
 import static com.xiaotong.keydetector.Constant.ROOT_UNKNOWN;
 
+import android.util.Log;
+
 import com.xiaotong.keydetector.CheckerContext;
+import com.xiaotong.keydetector.Util;
 
 public final class UnknownRootChecker extends Checker {
     @Override
@@ -12,7 +15,12 @@ public final class UnknownRootChecker extends Checker {
 
     @Override
     public boolean check(CheckerContext ctx) throws Exception {
-        return ctx.rootType == ROOT_UNKNOWN;
+        if (ctx.rootType == ROOT_UNKNOWN) {
+            Log.e("Detector", "Unknown attestation root key detected.");
+            Util.logCert("Root", ctx.certChain.get(ctx.certChain.size() - 1));
+            return true;
+        }
+        return false;
     }
 
     @Override
