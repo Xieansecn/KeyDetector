@@ -1,10 +1,12 @@
 name: Android CI
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Set to "true" to create a GitHub Release at the end.'
+        required: false
+        default: 'false'
 
 permissions:
   contents: write
@@ -54,11 +56,10 @@ jobs:
         path: app/build/outputs/apk/release/*.apk
 
     - name: Create GitHub Release
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true' }}
       uses: softprops/action-gh-release@v2
       with:
         tag_name: v${{ github.run_number }}
         files: |
           app/build/outputs/apk/debug/*.apk
           app/build/outputs/apk/release/*.apk
-
