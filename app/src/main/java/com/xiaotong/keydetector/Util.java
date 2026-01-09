@@ -93,7 +93,6 @@ public class Util {
     }
 
     static CheckerContext getCheckerContext(Context appContext) {
-        BinderHookHandler.installHook();
         Security.removeProvider("BC");
         if (Security.getProvider("BC") == null) Security.addProvider(new BouncyCastleProvider());
         try {
@@ -103,6 +102,7 @@ public class Util {
         } catch (Throwable t) {
             Log.w("Util", "HiddenApiBypass failed", t);
         }
+        BinderHookHandler.installHook();
         try {
             KeyStore keyStore = KeyStore.getInstance(KEYSTORE_PROVIDER);
             keyStore.load(null);
