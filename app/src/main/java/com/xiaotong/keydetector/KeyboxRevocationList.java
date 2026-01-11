@@ -3,9 +3,6 @@ package com.xiaotong.keydetector;
 import android.content.Context;
 import android.content.res.Resources;
 import android.util.Log;
-
-import org.json.JSONObject;
-
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -16,6 +13,7 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.json.JSONObject;
 
 public final class KeyboxRevocationList {
     private static final String TAG = "KeyboxRevocationList";
@@ -115,6 +113,5 @@ public final class KeyboxRevocationList {
         return new String(out.toByteArray(), StandardCharsets.UTF_8);
     }
 
-    private KeyboxRevocationList() {
-    }
+    private KeyboxRevocationList() {}
 }

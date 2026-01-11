@@ -3,13 +3,11 @@ package com.xiaotong.keydetector.checker;
 import static com.xiaotong.keydetector.Constant.KEY_ATTESTATION_OID;
 
 import com.xiaotong.keydetector.CheckerContext;
-
+import java.security.cert.X509Certificate;
+import java.util.Arrays;
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.ASN1Sequence;
-
-import java.security.cert.X509Certificate;
-import java.util.Arrays;
 
 public final class ChallengeChecker extends Checker {
     @Override
@@ -18,7 +16,7 @@ public final class ChallengeChecker extends Checker {
     }
 
     @Override
-    public boolean check(CheckerContext ctx) throws Exception{
+    public boolean check(CheckerContext ctx) throws Exception {
         final X509Certificate leafCert = ctx.certChain.get(0);
         final byte[] extBytes = leafCert.getExtensionValue(KEY_ATTESTATION_OID);
         if (extBytes == null) return false;

@@ -8,25 +8,28 @@ import static com.xiaotong.keydetector.Constant.ROOT_UNKNOWN;
 import static com.xiaotong.keydetector.Constant.ROOT_VENDOR_REQUIRED;
 
 import android.util.Log;
-
 import com.xiaotong.keydetector.checker.AOSPRootChecker;
 import com.xiaotong.keydetector.checker.AttestationComplianceChecker;
+import com.xiaotong.keydetector.checker.BehaviorChecker;
 import com.xiaotong.keydetector.checker.BinderConsistencyChecker;
 import com.xiaotong.keydetector.checker.BinderHookChecker;
 import com.xiaotong.keydetector.checker.BouncyCastleChainChecker;
 import com.xiaotong.keydetector.checker.ChallengeChecker;
 import com.xiaotong.keydetector.checker.Checker;
 import com.xiaotong.keydetector.checker.KeyConsistencyChecker;
+import com.xiaotong.keydetector.checker.ListEntriesChecker;
 import com.xiaotong.keydetector.checker.PatchModeChecker;
 import com.xiaotong.keydetector.checker.RevokedKeyChecker;
+import com.xiaotong.keydetector.checker.SecurityLevelChecker;
 import com.xiaotong.keydetector.checker.UnknownRootChecker;
+import com.xiaotong.keydetector.checker.UpdateSubcompChecker;
 import com.xiaotong.keydetector.checker.VBMetaChecker;
-
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 public final class DetectorEngine {
     public static final LinkedHashMap<Integer, Checker> FlagCheckerMap = new LinkedHashMap<>();
+
     static {
         FlagCheckerMap.put(2, new BinderConsistencyChecker());
         FlagCheckerMap.put(4, new BinderHookChecker());
@@ -39,6 +42,10 @@ public final class DetectorEngine {
         FlagCheckerMap.put(512, new PatchModeChecker());
         FlagCheckerMap.put(1024, new AttestationComplianceChecker());
         FlagCheckerMap.put(2048, new VBMetaChecker());
+        FlagCheckerMap.put(8192, new BehaviorChecker());
+        FlagCheckerMap.put(16384, new ListEntriesChecker());
+        FlagCheckerMap.put(32768, new UpdateSubcompChecker());
+        FlagCheckerMap.put(65536, new SecurityLevelChecker());
     }
 
     public int run(CheckerContext ctx) {
@@ -50,8 +57,9 @@ public final class DetectorEngine {
                 boolean hit = entry.getValue().check(ctx);
                 if (hit) {
                     result |= entry.getKey();
-                    Log.e("Detector", "Hit: " + entry.getValue().name()
-                            + " flag=0x" + Integer.toHexString(entry.getKey()));
+                    Log.e(
+                            "Detector",
+                            "Hit: " + entry.getValue().name() + " flag=0x" + Integer.toHexString(entry.getKey()));
                 }
             } catch (Throwable t) {
                 Log.e("Detector", "Checker crashed: " + entry.getValue().name(), t);
@@ -71,7 +79,7 @@ public final class DetectorEngine {
             locked = rot != null && Boolean.TRUE.equals(rot.getDeviceLocked());
             verified = rot != null && Integer.valueOf(0).equals(rot.getVerifiedBootState());
         }
-        
+
         if (result == 0) {
             if (locked && verified) {
                 result |= RESULT_TRUSTED;
@@ -79,19 +87,30 @@ public final class DetectorEngine {
         }
 
         boolean trustedBoot = (result & RESULT_TRUSTED) != 0;
-        boolean rootTrusted = ctx.rootType == ROOT_GOOGLE_F || ctx.rootType == ROOT_GOOGLE_I || ctx.rootType == ROOT_VENDOR_REQUIRED;
-        boolean attestationOk = (result & (2 | 32 | 64 | 128 | 256 | 512)) == 0;
+        boolean rootTrusted =
+                ctx.rootType == ROOT_GOOGLE_F || ctx.rootType == ROOT_GOOGLE_I || ctx.rootType == ROOT_VENDOR_REQUIRED;
+        boolean attestationOk = (result & (2 | 32 | 64 | 128 | 256 | 512 | 8192 | 16384 | 32768 | 65536)) == 0;
 
         boolean abnormal = (result & RESULT_TRUSTED) == 0 || (result & ~RESULT_TRUSTED) != 0;
         if (abnormal) {
             Log.e("Detector", "=== Abnormal detection === code=" + result + " (0x" + Integer.toHexString(result) + ")");
-            Log.e("Detector", "TrustedBoot=" + trustedBoot
-                    + " rootTrusted=" + rootTrusted
-                    + " rootType=" + rootTypeToString(ctx.rootType)
-                    + " deviceLocked=" + (rot != null ? rot.getDeviceLocked() : "null")
-                    + " verifiedBootState=" + (rot != null ? rot.getVerifiedBootState() : "null")
-                    + " (" + verifiedBootStateToString(rot != null ? rot.getVerifiedBootState() : null) + ")"
-                    + " attestationOk=" + attestationOk);
+            Log.e(
+                    "Detector",
+                    "TrustedBoot="
+                            + trustedBoot
+                            + " rootTrusted="
+                            + rootTrusted
+                            + " rootType="
+                            + rootTypeToString(ctx.rootType)
+                            + " deviceLocked="
+                            + (rot != null ? rot.getDeviceLocked() : "null")
+                            + " verifiedBootState="
+                            + (rot != null ? rot.getVerifiedBootState() : "null")
+                            + " ("
+                            + verifiedBootStateToString(rot != null ? rot.getVerifiedBootState() : null)
+                            + ")"
+                            + " attestationOk="
+                            + attestationOk);
             if (rot != null && rot.getVerifiedBootHash() != null) {
                 Log.e("Detector", "VerifiedBootHash=" + Util.byteArrayToHexString(rot.getVerifiedBootHash()));
             }
@@ -100,7 +119,7 @@ public final class DetectorEngine {
         }
 
         Log.i("Detector", "=== Detection Finished. Code: " + result + " ===");
-        
+
         return result;
     }
 
@@ -160,6 +179,24 @@ public final class DetectorEngine {
         }
         if ((code & 512) != 0) {
             Log.e("Detector", "Flag set: Patch Mode Detected (512)");
+        }
+        if ((code & 1024) != 0) {
+            Log.e("Detector", "Flag set: Non-compliant Keystore (1024)");
+        }
+        if ((code & 2048) != 0) {
+            Log.e("Detector", "Flag set: VBMeta/State Mismatch (2048)");
+        }
+        if ((code & 8192) != 0) {
+            Log.e("Detector", "Flag set: Keystore 2.0 LRU Pruning Anomaly (8192)");
+        }
+        if ((code & 16384) != 0) {
+            Log.e("Detector", "Flag set: IKeystoreService ListEntries Anomaly (16384)");
+        }
+        if ((code & 32768) != 0) {
+            Log.e("Detector", "Flag set: IKeystoreService State Inconsistency (32768)");
+        }
+        if ((code & 65536) != 0) {
+            Log.e("Detector", "Flag set: Keystore 2.0 SecurityLevel Anomaly (65536)");
         }
     }
 }

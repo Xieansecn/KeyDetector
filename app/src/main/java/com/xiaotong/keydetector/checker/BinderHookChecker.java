@@ -10,7 +10,7 @@ public final class BinderHookChecker extends Checker {
     }
 
     @Override
-    public boolean check(CheckerContext ctx) throws Exception{
+    public boolean check(CheckerContext ctx) throws Exception {
         return !BinderHookHandler.isHookSuccess();
     }
 

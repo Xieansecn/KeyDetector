@@ -1,10 +1,8 @@
 package com.xiaotong.keydetector.checker;
 
 import android.util.Log;
-
 import com.xiaotong.keydetector.CheckerContext;
 import com.xiaotong.keydetector.KeyboxRevocationList;
-
 import java.security.cert.X509Certificate;
 import java.util.Locale;
 

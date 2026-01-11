@@ -5,10 +5,8 @@ import static com.xiaotong.keydetector.Util.buildFullChainBytes;
 import static com.xiaotong.keydetector.Util.chainsEqualDer;
 
 import android.util.Log;
-
 import com.xiaotong.keydetector.CheckerContext;
 import com.xiaotong.keydetector.handler.BinderHookHandler;
-
 import java.util.Arrays;
 import java.util.List;
 
@@ -23,16 +21,20 @@ public final class PatchModeChecker extends Checker {
         // 512
         byte[] binderGenerateLeaf = BinderHookHandler.getGenerateKeyLeafCertificate(KEY_ALIAS);
         byte[] binderGenerateChainBlob = BinderHookHandler.getGenerateKeyCertificateChainBlob(KEY_ALIAS);
-        
+
         if (binderGenerateLeaf == null) {
             return false;
         }
 
         byte[] binderKeyEntryLeaf = BinderHookHandler.getKeyEntryLeafCertificate(KEY_ALIAS);
-        byte[] referenceLeaf = binderKeyEntryLeaf != null ? binderKeyEntryLeaf : ctx.certChain.get(0).getEncoded();
-        
+        byte[] referenceLeaf = binderKeyEntryLeaf != null
+                ? binderKeyEntryLeaf
+                : ctx.certChain.get(0).getEncoded();
+
         if (!Arrays.equals(binderGenerateLeaf, referenceLeaf)) {
-            Log.e("PatchModeChecker", "Patch mode detected: leaf certificate differs between generateKey and getKeyEntry");
+            Log.e(
+                    "PatchModeChecker",
+                    "Patch mode detected: leaf certificate differs between generateKey and getKeyEntry");
             return true;
         } else if (binderKeyEntryLeaf != null) {
             byte[] binderKeyEntryChainBlob = BinderHookHandler.getKeyEntryCertificateChainBlob(KEY_ALIAS);
@@ -43,7 +45,7 @@ public final class PatchModeChecker extends Checker {
                 return true;
             }
         }
-        
+
         return false;
     }
 

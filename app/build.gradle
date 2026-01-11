@@ -1,6 +1,9 @@
 plugins {
     alias(libs.plugins.android.application)
+    id "com.diffplug.spotless" version "6.25.0"
 }
+
+import java.security.MessageDigest
 
 android {
     namespace = "com.xiaotong.keydetector"
@@ -34,7 +37,10 @@ android {
     buildTypes {
 
         release {
-            signingConfig = signingConfigs.getByName("debugKey")
+            def debugKeyConfig = signingConfigs.findByName("debugKey")
+            if (debugKeyConfig != null) {
+                signingConfig = debugKeyConfig
+            }
 
             minifyEnabled true
             shrinkResources true
@@ -44,7 +50,10 @@ android {
         }
 
         debug {
-            signingConfig = signingConfigs.getByName("debugKey")
+            def debugKeyConfig = signingConfigs.findByName("debugKey")
+            if (debugKeyConfig != null) {
+                signingConfig = debugKeyConfig
+            }
         }
     }
 
@@ -64,10 +73,22 @@ dependencies {
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
     implementation libs.bcpkix.jdk15to18
-    implementation libs.bcprov.jdk15to18
     implementation libs.hiddenapibypass
+    implementation libs.bcprov.jdk15to18
 }
-import java.security.MessageDigest
+
+spotless {
+    java {
+        target 'src/*/java/**/*.java'
+        palantirJavaFormat()
+        importOrder()
+        removeUnusedImports()
+    }
+    kotlin {
+        target 'src/*/kotlin/**/*.kt'
+        ktlint()
+    }
+}
 
 def attestationStatusUrl = "https://android.googleapis.com/attestation/status"
 def rawDir = file("src/main/res/raw")
@@ -118,3 +139,8 @@ tasks.register("checkAttestationStatus") {
     }
 }
 
+tasks.register('format') {
+    dependsOn 'spotlessApply'
+    group = 'formatting'
+    description = 'Formats the code using Spotless'
+}

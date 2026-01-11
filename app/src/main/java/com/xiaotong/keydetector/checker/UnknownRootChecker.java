@@ -3,7 +3,6 @@ package com.xiaotong.keydetector.checker;
 import static com.xiaotong.keydetector.Constant.ROOT_UNKNOWN;
 
 import android.util.Log;
-
 import com.xiaotong.keydetector.CheckerContext;
 import com.xiaotong.keydetector.Util;
 

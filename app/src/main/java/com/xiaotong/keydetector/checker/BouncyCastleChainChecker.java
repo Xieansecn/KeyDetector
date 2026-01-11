@@ -1,16 +1,13 @@
 package com.xiaotong.keydetector.checker;
 
 import android.util.Log;
-
 import com.xiaotong.keydetector.CheckerContext;
-
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-
 import java.security.GeneralSecurityException;
 import java.security.PublicKey;
 import java.security.Security;
 import java.security.cert.X509Certificate;
 import java.util.List;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 public final class BouncyCastleChainChecker extends Checker {
     @Override
@@ -19,7 +16,7 @@ public final class BouncyCastleChainChecker extends Checker {
     }
 
     @Override
-    public boolean check(CheckerContext ctx) throws Exception{
+    public boolean check(CheckerContext ctx) throws Exception {
         return !verifyChainWithBouncyCastle(ctx.certChain);
     }
 
@@ -61,4 +58,3 @@ public final class BouncyCastleChainChecker extends Checker {
         return "Broken Chain (%d)\n证书链签名验证失败，疑似中间人篡改";
     }
 }
-

@@ -3,7 +3,6 @@ package com.xiaotong.keydetector;
 import static com.xiaotong.keydetector.Util.classifyRootType;
 
 import android.content.Context;
-
 import java.security.KeyStore;
 import java.security.cert.X509Certificate;
 import java.util.List;
@@ -27,4 +26,3 @@ public class CheckerContext {
         this.challenge = challenge;
     }
 }
-

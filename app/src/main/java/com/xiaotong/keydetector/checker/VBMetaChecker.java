@@ -4,10 +4,8 @@ import static com.xiaotong.keydetector.Util.getSystemProperty;
 import static com.xiaotong.keydetector.Util.hexStringToByteArray;
 
 import android.util.Log;
-
 import com.xiaotong.keydetector.CheckerContext;
 import com.xiaotong.keydetector.RootOfTrust;
-
 import java.util.Arrays;
 
 public final class VBMetaChecker extends Checker {
@@ -37,9 +35,7 @@ public final class VBMetaChecker extends Checker {
         boolean digestMismatchHash = !isDummyHash && !Arrays.equals(systemVBMetaDigest, hash);
         boolean bootStateUnverified = rot.getVerifiedBootState() != 0; // 0 = VERIFIED
         boolean deviceUnlocked = !rot.getDeviceLocked();
-        return digestMismatchHash
-                || bootStateUnverified
-                || deviceUnlocked;
+        return digestMismatchHash || bootStateUnverified || deviceUnlocked;
     }
 
     @Override

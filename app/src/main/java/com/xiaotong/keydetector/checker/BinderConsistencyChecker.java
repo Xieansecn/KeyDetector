@@ -12,10 +12,8 @@ import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Log;
-
 import com.xiaotong.keydetector.CheckerContext;
 import com.xiaotong.keydetector.handler.BinderHookHandler;
-
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
@@ -66,7 +64,10 @@ public final class BinderConsistencyChecker extends Checker {
                 Log.e("BinderConsistency", "No binder-captured certificate data found (keystore2/legacy)");
                 failure = true;
             } else if (!chainsEqualKeystoreVsDer(ctx.certChain, binderKeyEntryFull)) {
-                Log.e("BinderConsistency", "Keystore chain differs from Binder chain: " + describeChainMismatch(ctx.certChain, binderKeyEntryFull));
+                Log.e(
+                        "BinderConsistency",
+                        "Keystore chain differs from Binder chain: "
+                                + describeChainMismatch(ctx.certChain, binderKeyEntryFull));
                 failure = true;
             }
         }
@@ -102,7 +103,8 @@ public final class BinderConsistencyChecker extends Checker {
             Date now = new Date();
             byte[] challenge = now.toString().getBytes(StandardCharsets.UTF_8);
 
-            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, KEYSTORE_PROVIDER);
+            KeyPairGenerator keyPairGenerator =
+                    KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, KEYSTORE_PROVIDER);
             KeyGenParameterSpec.Builder builder = new KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_SIGN)
                     .setAlgorithmParameterSpec(new ECGenParameterSpec("secp256r1"))
                     .setDigests(KeyProperties.DIGEST_SHA256)
@@ -145,8 +147,7 @@ public final class BinderConsistencyChecker extends Checker {
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             List<X509Certificate> sanitizedChain = new ArrayList<>();
             for (Certificate c : rawChain) {
-                sanitizedChain.add((X509Certificate) cf.generateCertificate(
-                        new ByteArrayInputStream(c.getEncoded())));
+                sanitizedChain.add((X509Certificate) cf.generateCertificate(new ByteArrayInputStream(c.getEncoded())));
             }
 
             return checkProbeKeyBinderConsistency(alias, sanitizedChain);
@@ -184,8 +185,10 @@ public final class BinderConsistencyChecker extends Checker {
                 return true;
             }
             if (!chainsEqualKeystoreVsDer(keystoreChain, binderKeyEntryFull)) {
-                Log.e("BinderConsistency", "Active probe: keystore chain differs from binder chain: "
-                        + describeChainMismatch(keystoreChain, binderKeyEntryFull));
+                Log.e(
+                        "BinderConsistency",
+                        "Active probe: keystore chain differs from binder chain: "
+                                + describeChainMismatch(keystoreChain, binderKeyEntryFull));
                 return true;
             }
 
@@ -195,9 +198,13 @@ public final class BinderConsistencyChecker extends Checker {
                 return true;
             }
 
-            byte[] referenceLeaf = binderKeyEntryLeaf != null ? binderKeyEntryLeaf : keystoreChain.get(0).getEncoded();
+            byte[] referenceLeaf = binderKeyEntryLeaf != null
+                    ? binderKeyEntryLeaf
+                    : keystoreChain.get(0).getEncoded();
             if (!Arrays.equals(binderGenerateLeaf, referenceLeaf)) {
-                Log.e("BinderConsistency", "Active probe: leaf certificate differs between generateKey and getKeyEntry");
+                Log.e(
+                        "BinderConsistency",
+                        "Active probe: leaf certificate differs between generateKey and getKeyEntry");
                 return true;
             }
 

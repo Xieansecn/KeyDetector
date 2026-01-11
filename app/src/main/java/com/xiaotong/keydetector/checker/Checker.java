@@ -7,8 +7,7 @@ public abstract class Checker {
     public abstract String name();
 
     /**
-     * @return true  = 命中（异常 / 特征存在）
-     *         false = 未命中
+     * @return true = 命中（异常 / 特征存在） false = 未命中
      */
     public abstract boolean check(CheckerContext ctx) throws Exception;
 

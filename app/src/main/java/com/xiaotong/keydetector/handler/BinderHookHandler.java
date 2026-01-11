@@ -3,7 +3,6 @@ package com.xiaotong.keydetector.handler;
 import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
-
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
@@ -101,15 +100,13 @@ public class BinderHookHandler {
 
             Object proxyService = Proxy.newProxyInstance(
                     smClass.getClassLoader(),
-                    new Class[]{iKeystoreServiceClass},
-                    new Keystore2InvocationHandler(realService)
-            );
+                    new Class[] {iKeystoreServiceClass},
+                    new Keystore2InvocationHandler(realService));
 
             IBinder proxyBinder = (IBinder) Proxy.newProxyInstance(
                     smClass.getClassLoader(),
-                    new Class[]{IBinder.class},
-                    new BinderProxyHandler(originalBinder, proxyService, INTERFACE_NAME)
-            );
+                    new Class[] {IBinder.class},
+                    new BinderProxyHandler(originalBinder, proxyService, INTERFACE_NAME));
 
             sCache.put(SERVICE_NAME, proxyBinder);
             return true;
@@ -123,7 +120,7 @@ public class BinderHookHandler {
     private static boolean installLegacyKeystoreHook() {
         try {
             final String SERVICE_NAME = "android.security.keystore";
-            //android.security.IKeystoreService android.security.keystore.IKeystoreService
+            // android.security.IKeystoreService android.security.keystore.IKeystoreService
             String interfaceName = "android.security.keystore.IKeystoreService";
             String proxyClassName = "android.security.keystore.IKeystoreService$Stub$Proxy";
 
@@ -152,15 +149,13 @@ public class BinderHookHandler {
 
             Object proxyService = Proxy.newProxyInstance(
                     smClass.getClassLoader(),
-                    new Class[]{iKeystoreServiceClass},
-                    new LegacyKeystoreInvocationHandler(realService)
-            );
+                    new Class[] {iKeystoreServiceClass},
+                    new LegacyKeystoreInvocationHandler(realService));
 
             IBinder proxyBinder = (IBinder) Proxy.newProxyInstance(
                     smClass.getClassLoader(),
-                    new Class[]{IBinder.class},
-                    new BinderProxyHandler(originalBinder, proxyService, interfaceName)
-            );
+                    new Class[] {IBinder.class},
+                    new BinderProxyHandler(originalBinder, proxyService, interfaceName));
 
             sCache.put(SERVICE_NAME, proxyBinder);
             return true;
@@ -262,9 +257,8 @@ public class BinderHookHandler {
             }
             return Proxy.newProxyInstance(
                     securityLevelInterface.getClassLoader(),
-                    new Class[]{securityLevelInterface},
-                    new KeyMintSecurityLevelInvocationHandler(securityLevel)
-            );
+                    new Class[] {securityLevelInterface},
+                    new KeyMintSecurityLevelInvocationHandler(securityLevel));
         } catch (Throwable t) {
             Log.w(TAG, "Failed to wrap IKeystoreSecurityLevel", t);
             return null;
@@ -304,7 +298,8 @@ public class BinderHookHandler {
         }
     }
 
-    private static Object getFieldValue(Object obj, String fieldName) throws NoSuchFieldException, IllegalAccessException {
+    private static Object getFieldValue(Object obj, String fieldName)
+            throws NoSuchFieldException, IllegalAccessException {
         Field f = obj.getClass().getField(fieldName);
         return f.get(obj);
     }
@@ -319,6 +314,7 @@ public class BinderHookHandler {
             return null;
         }
     }
+
     private static class LegacyKeystoreInvocationHandler implements InvocationHandler {
         private final Object realService;
 
@@ -371,4 +367,3 @@ public class BinderHookHandler {
         }
     }
 }
-

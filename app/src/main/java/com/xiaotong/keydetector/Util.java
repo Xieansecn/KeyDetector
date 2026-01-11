@@ -20,12 +20,7 @@ import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
 import android.util.Log;
-
 import com.xiaotong.keydetector.handler.BinderHookHandler;
-
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.lsposed.hiddenapibypass.HiddenApiBypass;
-
 import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
@@ -43,6 +38,8 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.lsposed.hiddenapibypass.HiddenApiBypass;
 
 public class Util {
     public static int classifyRootType(X509Certificate rootCert) {
@@ -58,16 +55,19 @@ public class Util {
     @SuppressLint("PrivateApi")
     public static String getSystemProperty(String key) {
         try {
-             Class<?> c = Class.forName("android.os.SystemProperties");
+            Class<?> c = Class.forName("android.os.SystemProperties");
             Method m = c.getDeclaredMethod("get", String.class);
             return (String) m.invoke(null, key);
-        } catch (Exception e) { return null; }
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public static byte[] hexStringToByteArray(String hex) {
         if (hex == null) throw new IllegalArgumentException("hex string is null");
         String s = hex.trim();
-        if ((s.length() & 1) != 0) throw new IllegalArgumentException("hex string must have even length: " + s.length());
+        if ((s.length() & 1) != 0)
+            throw new IllegalArgumentException("hex string must have even length: " + s.length());
         int len = s.length();
         byte[] out = new byte[len / 2];
         for (int i = 0; i < len; i += 2) {
@@ -108,9 +108,11 @@ public class Util {
             keyStore.load(null);
             try {
                 if (keyStore.containsAlias(KEY_ALIAS)) keyStore.deleteEntry(KEY_ALIAS);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) {
+            }
             byte[] challenge = java.util.UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8);
-            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, KEYSTORE_PROVIDER);
+            KeyPairGenerator keyPairGenerator =
+                    KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, KEYSTORE_PROVIDER);
             KeyGenParameterSpec.Builder builder = new KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_SIGN)
                     .setAlgorithmParameterSpec(new ECGenParameterSpec("secp256r1"))
                     .setDigests(KeyProperties.DIGEST_SHA256)
@@ -126,8 +128,7 @@ public class Util {
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             List<X509Certificate> sanitizedChain = new ArrayList<>();
             for (Certificate c : rawChain) {
-                sanitizedChain.add((X509Certificate) cf.generateCertificate(
-                        new ByteArrayInputStream(c.getEncoded())));
+                sanitizedChain.add((X509Certificate) cf.generateCertificate(new ByteArrayInputStream(c.getEncoded())));
             }
             return new CheckerContext(appContext, keyStore, sanitizedChain, challenge);
         } catch (Throwable t) {
@@ -211,8 +212,10 @@ public class Util {
 
     public static String describeChainMismatch(List<X509Certificate> keystoreChain, List<byte[]> otherChainDer) {
         if (keystoreChain == null || otherChainDer == null) {
-            return "keystore=" + (keystoreChain == null ? "null" : "non-null")
-                    + " binder=" + (otherChainDer == null ? "null" : "non-null");
+            return "keystore="
+                    + (keystoreChain == null ? "null" : "non-null")
+                    + " binder="
+                    + (otherChainDer == null ? "null" : "non-null");
         }
         int min = Math.min(keystoreChain.size(), otherChainDer.size());
         for (int i = 0; i < min; i++) {
@@ -220,9 +223,16 @@ public class Util {
                 byte[] a = keystoreChain.get(i).getEncoded();
                 byte[] b = otherChainDer.get(i);
                 if (!Arrays.equals(a, b)) {
-                    return "mismatchIndex=" + i
-                            + " keystoreSerial=" + keystoreChain.get(i).getSerialNumber().toString(16).toLowerCase(Locale.US)
-                            + " binderSerial=" + tryGetSerialHex(b);
+                    return "mismatchIndex="
+                            + i
+                            + " keystoreSerial="
+                            + keystoreChain
+                                    .get(i)
+                                    .getSerialNumber()
+                                    .toString(16)
+                                    .toLowerCase(Locale.US)
+                            + " binderSerial="
+                            + tryGetSerialHex(b);
                 }
             } catch (Throwable ignored) {
                 return "mismatchIndex=" + i + " (encode/parse failed)";
@@ -262,12 +272,19 @@ public class Util {
             return;
         }
         try {
-            Log.e("KeyDetector", label
-                    + " serialHex=" + cert.getSerialNumber().toString(16).toLowerCase(Locale.US)
-                    + " sigAlg=" + cert.getSigAlgName()
-                    + " pubKeyAlg=" + cert.getPublicKey().getAlgorithm()
-                    + " notBefore=" + cert.getNotBefore()
-                    + " notAfter=" + cert.getNotAfter());
+            Log.e(
+                    "KeyDetector",
+                    label
+                            + " serialHex="
+                            + cert.getSerialNumber().toString(16).toLowerCase(Locale.US)
+                            + " sigAlg="
+                            + cert.getSigAlgName()
+                            + " pubKeyAlg="
+                            + cert.getPublicKey().getAlgorithm()
+                            + " notBefore="
+                            + cert.getNotBefore()
+                            + " notAfter="
+                            + cert.getNotAfter());
             Log.e("KeyDetector", label + " subject=" + cert.getSubjectX500Principal());
             Log.e("KeyDetector", label + " issuer=" + cert.getIssuerX500Principal());
         } catch (Throwable t) {

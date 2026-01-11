@@ -3,20 +3,17 @@ package com.xiaotong.keydetector.checker;
 import static com.xiaotong.keydetector.Constant.KEY_ALIAS;
 
 import android.util.Log;
-
 import com.xiaotong.keydetector.CheckerContext;
 import com.xiaotong.keydetector.Util;
-
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Security;
 import java.security.Signature;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
-public final class KeyConsistencyChecker extends Checker{
+public final class KeyConsistencyChecker extends Checker {
     @Override
     public String name() {
         return this.getClass().getName();
@@ -40,7 +37,9 @@ public final class KeyConsistencyChecker extends Checker{
         verifier.update(data);
         boolean ok = verifier.verify(signature);
         if (!ok) {
-            Log.e("Detector", "Key consistency failed: certificate public key cannot verify keystore private-key signature.");
+            Log.e(
+                    "Detector",
+                    "Key consistency failed: certificate public key cannot verify keystore private-key signature.");
             Util.logCert("Leaf", ctx.certChain.get(0));
         }
         return !ok;
